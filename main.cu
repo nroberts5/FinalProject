@@ -7,8 +7,48 @@
 #include <chrono>
 #include <thrust/host_vector.h>
 #include <thrust/transform.h>
+#include <omp.h>
 
 using namespace std;
+
+class stopwatch
+{
+  struct timespec start_time, stop_time;
+  double elapsed;
+  bool running = false;
+  bool onscreen = false;
+public:
+  void click()
+  {
+    if(running)
+    {
+      clock_gettime(CLOCK_MONOTONIC, &(this->stop_time));
+      this->running = false;
+      this->onscreen = true;
+    }
+    else
+    {
+      clock_gettime(CLOCK_MONOTONIC, &(this->start_time));
+      this->running = true;
+      this->onscreen = false;
+    }
+  }
+  double check()
+  {
+    if(onscreen)
+    {
+      this->elapsed = (this->stop_time.tv_sec - this->start_time.tv_sec);
+      this->elapsed += (this->stop_time.tv_nsec - this->start_time.tv_nsec) / 1000000000.0;
+      return this->elapsed*1000;
+    }
+    else
+      return 0.0;
+  }
+  void print_time()
+  {
+    std::cout<<this->check()<<"ms\n";
+  }
+};
 
 #define FIELD_STRENGTH 3.0
 #define PI 3.141592654
@@ -40,16 +80,21 @@ float* signal_equation(const float TR, const float alpha, const float TE, const 
 	return sig;
 }
 
-float* noiseless_signal_vector(const int N, const float* TR, const float* alpha, const float* TE, const float beta, const float T1__F, const float T1__W, const float rho__F, const float rho__W, const float R2s, const float phi, const float psi)
+float* noiseless_signal_vector(const int N, const float* TR, const float* alpha, const float* TE, const float beta, const float T1__F, const float T1__W, const float rho__F, const float rho__W, const float R2s, const float phi, const float psi, const int NUMTHREADS)
 {
 	float* vect_out = new float[2*N]{};
+	float* sig;
 
-	for(int n=0; n<N; n++)
+	#pragma omp parallel shared(vect_out) private(sig) num_threads(NUMTHREADS)
 	{
-		float* sig = signal_equation(TR[n], alpha[n], TE[n], beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi);
-		vect_out[n] = sig[0];
-		vect_out[n+N] = sig[1];
-		// cout<<sig[0]<<"+j"<<sig[1]<<endl;
+		#pragma omp for nowait
+		for(int n=0; n<N; n++)
+		{
+			sig = signal_equation(TR[n], alpha[n], TE[n], beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi);
+			vect_out[n] = sig[0];
+			vect_out[n+N] = sig[1];
+		}
+
 	}
 	return vect_out;
 }
@@ -74,35 +119,66 @@ void parray(float* v, int N)
 	cout<<endl;
 }
 
-float* noise_vector(const int N, const float stddev)
+float* noise_vector(const int N, const float stddev, const int NUMTHREADS)
 {  
+	float* vect = new float[N]{}; 
+
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-  	default_random_engine generator (seed);
+	default_random_engine generator (seed);
 	normal_distribution<float> distribution(0.0,stddev);
-	float* vect = new float[N]{}; for(int n=0;n<N;n++){vect[n]=distribution(generator);}
+
+
+	#pragma omp parallel shared(vect, stddev) private(seed) num_threads(NUMTHREADS)
+	{
+		#pragma omp for nowait
+		for (int n = 0; n < N; n++)
+		{
+			vect[n]=distribution(generator);
+		}
+
+	}
+
+
 	return vect;
 }
 
 
 int main(int argc, char const *argv[])
 {
-	int Nacqs = 3;
+	int NUMTHREADS;
+	if (argc<2)
+	{
+		cout<<"Usage ./main N (N=number of threads)";
+		return 1;
+	}
+	else
+	{
+		NUMTHREADS = atoi(argv[1]);
+
+	}
+
+	int NPs = 3; // Number of TR/FlipAngle Pairs
 	int NTEs = 6;
-	int N = Nacqs*NTEs;
+	int NACQS = NPs*NTEs;
 
 	float tes[NTEs] = {1.2e-3,3.2e-3,5.2e-3,7.2e-3,9.2e-3,11.2e-3};
-	float trs[Nacqs] = {5e-3,10e-3,15e-3};
-	float tips[Nacqs] = {6*PI/180,12*PI/180,80*PI/180};
+	float trs[NPs] = {5e-3,10e-3,15e-3};
+	float tips[NPs] = {6*PI/180,12*PI/180,80*PI/180};
 
-	float TES[N]{}; for (int i = 0; i < N; i++) { TES[i] = tes[i%NTEs];}
-	float TRS[N]{}; for (int i = 0; i < N; i++) { TRS[i] = trs[i/NTEs];}
-	float TIPS[N]{}; for (int i = 0; i < N; i++) { TIPS[i] = tips[i/NTEs];}
+	float TES[NACQS]{}; for (int i = 0; i < NACQS; i++) { TES[i] = tes[i%NTEs];}
+	float TRS[NACQS]{}; for (int i = 0; i < NACQS; i++) { TRS[i] = trs[i/NTEs];}
+	float TIPS[NACQS]{}; for (int i = 0; i < NACQS; i++) { TIPS[i] = tips[i/NTEs];}
 
-	float* pure_signal = noiseless_signal_vector(N, TRS, TIPS, TES,1.0,312e-3,822e-3,50,9050,30,0,0);
 
-	float simulated_signal[2*N]{};
-	thrust::transform(thrust::host, pure_signal, pure_signal+(2*N), noise_vector((2*N),1.0), simulated_signal, thrust::plus<float>());
-	parray(simulated_signal,(2*N));
+	struct stopwatch sw;
+	sw.click();
+	float* pure_signal = noiseless_signal_vector(NACQS, TRS, TIPS, TES,1.0,312e-3,822e-3,50,9050,30,0,0, NUMTHREADS);
+
+	float simulated_signal[2*NACQS]{};
+	thrust::transform(thrust::host, pure_signal, pure_signal+(2*NACQS), noise_vector((2*NACQS),1.0, NUMTHREADS), simulated_signal, thrust::plus<float>());
+	sw.click();
+	sw.print_time();
+	parray(simulated_signal,(2*NACQS));
 
 	return 0;
 }
