@@ -5,9 +5,15 @@
 #include <vector>
 #include <random>
 #include <chrono>
-#include <thrust/host_vector.h>
 #include <thrust/transform.h>
 #include <omp.h>
+#include <thrust/random/linear_congruential_engine.h>
+#include <thrust/random/normal_distribution.h>
+#include <thrust/generate.h>
+#include <thrust/host_vector.h>
+#include <thrust/execution_policy.h>
+#include <cstdlib>
+
 
 using namespace std;
 
@@ -49,6 +55,11 @@ public:
     std::cout<<this->check()<<"ms\n";
   }
 };
+
+int rc2ii(int row, int col, int N)
+{
+    return row*N + col;
+}
 
 #define FIELD_STRENGTH 3.0
 #define PI 3.141592654
@@ -119,13 +130,28 @@ void parray(float* v, int N)
 	cout<<endl;
 }
 
+void printmat(float* v, int rows, int cols)
+{
+	for (int row = 0; row < rows; row++)
+	{
+		for (int col = 0; col < cols; col++)
+		{
+			cout<<v[col+row*cols]<<" ";
+		}
+		cout<<"\n";
+	}
+}
+
+unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+
+default_random_engine generator (seed);
+
+
 float* noise_vector(const int N, const float stddev, const int NUMTHREADS)
 {  
 	float* vect = new float[N]{}; 
 
-	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-	default_random_engine generator (seed);
-	normal_distribution<float> distribution(0.0,stddev);
+	normal_distribution<float> distribution(0.0,1.0);
 
 
 	#pragma omp parallel shared(vect, stddev) private(seed) num_threads(NUMTHREADS)
@@ -142,19 +168,49 @@ float* noise_vector(const int N, const float stddev, const int NUMTHREADS)
 	return vect;
 }
 
+// thrust::minstd_rand rng (seed);
+// thrust::random::normal_distribution<float> dist(0.0, 1.0);
+// struct GenRand
+// {
+// 	__device__ __host__ 
+// 	float operator ()()
+// 	{
+// 		return dist(rng);
+// 	}
+// };
+
+
+float* tile_vector(const float* vect, const int n, const int numREPS, const int NUMTHREADS)
+{
+	float* vect_out = new float[numREPS*n];
+	
+	#pragma omp parallel shared(vect_out, numREPS, n) num_threads(NUMTHREADS)
+	{
+		#pragma omp for nowait
+		for (int i = 0; i < numREPS; i++)
+		{
+			memcpy(&vect_out[i*n], vect, n*sizeof(*vect));
+		}
+	}
+
+	return vect_out;
+}
+
 
 int main(int argc, char const *argv[])
 {
 	int NUMTHREADS;
-	if (argc<2)
+	int NSIMS;
+
+	if (argc<3)
 	{
-		cout<<"Usage ./main N (N=number of threads)";
+		cout<<"Usage ./main N (N=number of threads)\n";
 		return 1;
 	}
 	else
 	{
 		NUMTHREADS = atoi(argv[1]);
-
+		NSIMS = atoi(argv[2]);
 	}
 
 	int NPs = 3; // Number of TR/FlipAngle Pairs
@@ -173,12 +229,35 @@ int main(int argc, char const *argv[])
 	struct stopwatch sw;
 	sw.click();
 	float* pure_signal = noiseless_signal_vector(NACQS, TRS, TIPS, TES,1.0,312e-3,822e-3,50,9050,30,0,0, NUMTHREADS);
-
-	float simulated_signal[2*NACQS]{};
-	thrust::transform(thrust::host, pure_signal, pure_signal+(2*NACQS), noise_vector((2*NACQS),1.0, NUMTHREADS), simulated_signal, thrust::plus<float>());
 	sw.click();
-	sw.print_time();
-	parray(simulated_signal,(2*NACQS));
+	cout<<"Making orignal signal: "<<sw.check()<<endl;
+
+	sw.click();
+	float* pure_signal_mat = tile_vector(pure_signal,2*NACQS, NSIMS, NUMTHREADS);
+	sw.click();
+	cout<<"Repeating the Signal: "<<sw.check()<<endl;
+
+	sw.click();
+	float* nv = noise_vector((2*NACQS*NSIMS), 1.0, NUMTHREADS);
+	sw.click();
+	cout<<"Creating Noise Vector: "<<sw.check()<<endl;
+
+	// sw.click();
+	// float rd[2*NACQS*NSIMS];
+	// thrust::generate(thrust::host, rd, rd+(2*NACQS*NSIMS), GenRand());
+	// sw.click();
+	// cout<<"Thrust Noise Vector: "<<sw.check()<<endl;
+
+	sw.click();
+	float simulated_signal[2*NACQS*NSIMS]{};
+	thrust::host_vector<float> h_pure_sig(pure_signal_mat,pure_signal_mat+(2*NACQS*NSIMS));
+	thrust::host_vector<float> h_sim_sig(simulated_signal,simulated_signal+(2*NACQS*NSIMS));
+	thrust::host_vector<float> h_noise(nv,nv+(2*NACQS*NSIMS));
+	thrust::transform(thrust::host, h_pure_sig.begin(), h_pure_sig.end(), h_noise.begin(), h_sim_sig.begin(), thrust::plus<float>());
+	sw.click();
+	
+	cout<<"Adding the Noise: "<<sw.check()<<endl<<endl;
+
 
 	return 0;
 }
