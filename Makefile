@@ -26,8 +26,8 @@ all : main
 # problem1: problem1.cu 
 # 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)
 
-reader : main.cpp
-	@ g++ -o main -O3 main.cpp
+main : main.cu
+	@ module load cuda;nvcc -o main $(OPT) main.cu -ccbin $(BIN)
 
 # TODO: add targets for building executables
 
