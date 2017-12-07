@@ -168,6 +168,22 @@ float* noise_vector(const int N, const float stddev, const int NUMTHREADS)
 	return vect;
 }
 
+float* add_noise_2_vector(const float* vect_in, const int N, const float stddev, const int NUMTHREADS)
+{  
+	float* vect_out = new float[N]{}; 
+	normal_distribution<float> distribution(0.0,1.0);
+	#pragma omp parallel shared(vect, stddev) private(seed) num_threads(NUMTHREADS)
+	{
+		#pragma omp for nowait
+		for (int n = 0; n < N; n++)
+		{
+			vect_out[n]=vect_in[n]+distribution(generator);
+		}
+
+	}
+	return vect_out;
+}
+
 // thrust::minstd_rand rng (seed);
 // thrust::random::normal_distribution<float> dist(0.0, 1.0);
 // struct GenRand
@@ -214,8 +230,8 @@ int main(int argc, char const *argv[])
 	}
 
 	int NPs = 3; // Number of TR/FlipAngle Pairs
-	int NTEs = 6;
-	int NACQS = NPs*NTEs;
+	int NTEs = 6; // Number of Echoes
+	int NACQS = NPs*NTEs; //
 
 	float tes[NTEs] = {1.2e-3,3.2e-3,5.2e-3,7.2e-3,9.2e-3,11.2e-3};
 	float trs[NPs] = {5e-3,10e-3,15e-3};
@@ -237,10 +253,15 @@ int main(int argc, char const *argv[])
 	sw.click();
 	cout<<"Repeating the Signal: "<<sw.check()<<endl;
 
+	// sw.click();
+	// float* nv = noise_vector((2*NACQS*NSIMS), 1.0, NUMTHREADS);
+	// sw.click();
+	// cout<<"Creating Noise Vector: "<<sw.check()<<endl;
+
 	sw.click();
-	float* nv = noise_vector((2*NACQS*NSIMS), 1.0, NUMTHREADS);
+	float* simsig = add_noise_2_vector(pure_signal_mat, (2*NACQS*NSIMS), 1.0, NUMTHREADS);
 	sw.click();
-	cout<<"Creating Noise Vector: "<<sw.check()<<endl;
+	cout<<"Creating Simulated Signal with Noise Vector: "<<sw.check()<<endl;
 
 	// sw.click();
 	// float rd[2*NACQS*NSIMS];
@@ -248,15 +269,24 @@ int main(int argc, char const *argv[])
 	// sw.click();
 	// cout<<"Thrust Noise Vector: "<<sw.check()<<endl;
 
-	sw.click();
-	float simulated_signal[2*NACQS*NSIMS]{};
-	thrust::host_vector<float> h_pure_sig(pure_signal_mat,pure_signal_mat+(2*NACQS*NSIMS));
-	thrust::host_vector<float> h_sim_sig(simulated_signal,simulated_signal+(2*NACQS*NSIMS));
-	thrust::host_vector<float> h_noise(nv,nv+(2*NACQS*NSIMS));
-	thrust::transform(thrust::host, h_pure_sig.begin(), h_pure_sig.end(), h_noise.begin(), h_sim_sig.begin(), thrust::plus<float>());
-	sw.click();
+	// sw.click();
+	// float simulated_signal[2*NACQS*NSIMS]{};
+	// cout<<"pure_signal_mat size: "<<sizeof(pure_signal_mat)/sizeof(*pure_signal_mat)<<endl;
+	// cout<<"nv size: "<<sizeof(nv)/sizeof(*nv)<<endl;
+	// cout<<"simulated_signal size: "<<sizeof(simulated_signal)/sizeof(*simulated_signal)<<endl;
+
+	// for (int i = 0; i < 2*NACQS*NSIMS; i++)
+	// {
+	// 	simulated_signal[i] = pure_signal_mat[i]+nv[i];
+	// }
+
+	// thrust::host_vector<float> h_pure_sig(pure_signal_mat,pure_signal_mat+(2*NACQS*NSIMS));
+	// thrust::host_vector<float> h_sim_sig(simulated_signal,simulated_signal+(2*NACQS*NSIMS));
+	// thrust::host_vector<float> h_noise(nv,nv+(2*NACQS*NSIMS));
+	// thrust::transform(thrust::host, pure_signal_mat, pure_signal_mat+(2*NACQS*NSIMS), nv, simulated_signal, thrust::plus<float>());
+	// sw.click();
 	
-	cout<<"Adding the Noise: "<<sw.check()<<endl<<endl;
+	// cout<<"Adding the Noise: "<<sw.check()<<endl<<endl;
 
 
 	return 0;
