@@ -21,7 +21,7 @@ debug : LDFLAGS := -fsanitize=address
 debug : ARCH :=
 debug : $(EXEC)
 
-all : main test
+all : least_squares_test
 
 # problem1: problem1.cu 
 # 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)
@@ -32,9 +32,12 @@ main : main.cu
 test : test.cu
 	@ module load cuda;nvcc -o test $(OPT) test.cu -ccbin $(BIN)
 
+least_squares_test : least_squares_test.cu
+	@ module load cuda;nvcc -o least_squares_test $(OPT) least_squares_test.cu -ccbin $(BIN)
+
 # TODO: add targets for building executables
 
 .PHONY: clean
 clean:
-	rm -f main test
+	rm -f main test least_squares_test
 	rm -f *.err *.out
