@@ -21,7 +21,7 @@ debug : LDFLAGS := -fsanitize=address
 debug : ARCH :=
 debug : $(EXEC)
 
-all : main
+all : main test
 
 # problem1: problem1.cu 
 # 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)
@@ -29,9 +29,12 @@ all : main
 main : main.cu
 	@ module load cuda;nvcc -o main $(OPT) main.cu -ccbin $(BIN)
 
+test : test.cu
+	@ module load cuda;nvcc -o test $(OPT) test.cu -ccbin $(BIN)
+
 # TODO: add targets for building executables
 
 .PHONY: clean
 clean:
-	rm -f main
+	rm -f main test
 	rm -f *.err *.out
