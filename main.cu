@@ -59,11 +59,11 @@ float* noiseless_signal_vector(const int N, const float* TR, const float* alpha,
 	#pragma omp parallel shared(vect_out) private(sig) num_threads(NUMTHREADS)
 	{
 		#pragma omp for nowait
-		for(int n=0; n<N; n++)
+		for(int n=0; n<N; n+=2)
 		{
 			sig = signal_equation(TR[n], alpha[n], TE[n], beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi);
 			vect_out[n] = sig[0];
-			vect_out[n+N] = sig[1];
+			vect_out[n+1] = sig[1];
 		}
 
 	}
