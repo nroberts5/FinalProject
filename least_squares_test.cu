@@ -13,6 +13,9 @@
 #include "./dlib-19.7/dlib/optimization.h"
 #include <iostream>
 #include <vector>
+#include <omp.h>
+#include <chrono>
+#include <random>
 
 
 using namespace std;
@@ -44,10 +47,8 @@ float* fp_maker(const float* ppm)
 float* fp = fp_maker(ppm);
 float a[6] = {4.7/100, 3.9/ 100, 0.6/ 100, 12.0/ 100, 70.0/ 100, 8.8/ 100};
 
-column_vector signal (const column_vector& unknowns, const column_vector& trs, const column_vector& tips, const column_vector& tes)
+column_vector signal (const column_vector& acq_params, const column_vector& unknowns)
 {
-
-
     const double beta = unknowns(0);
     const double T1__F = unknowns(1);
     const double T1__W = unknowns(2);
@@ -57,21 +58,18 @@ column_vector signal (const column_vector& unknowns, const column_vector& trs, c
     const double phi = unknowns(6);
     const double psi = unknowns(7);
 
-    double TR;
-    double alpha;
-    double TE;
-    double sR;
-    double sI;
+    double TR; double alpha; double TE;
+    double sR; double sI;
 
     std::vector<double> v;
     // compute signal model function and return the result
-    for (int ACQNUM = 0; ACQNUM < trs.nr(); ACQNUM++)
+    for (int ACQNUM = 0; ACQNUM < 3; ACQNUM++)
     {
-        for (int TENUM = 0; TENUM < tes.nr(); TENUM++)
+        for (int TENUM = 0; TENUM < 6; TENUM++)
         {
-            TR = trs(ACQNUM);
-            alpha = tips(ACQNUM);
-            TE = tes(TENUM);
+            TR = acq_params(ACQNUM);
+            alpha = acq_params(ACQNUM+3);
+            TE = acq_params(TENUM+6);
             sR = ((rho__W * sin(beta * alpha) * (1.0 - exp(-TR / T1__W)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__W)) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * cos(2.0 * PI * fp[0] * TE) + a[1] * cos(2.0 * PI * fp[1] * TE) + a[2] * cos(2.0 * PI * fp[2] * TE) + a[3] * cos(2.0 * PI * fp[3] * TE) + a[4] * cos(2.0 * PI * fp[4] * TE) + a[5] * cos(2.0 * PI * fp[5] * TE)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * cos(TE * psi + phi) - rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * sin(2.0 * PI * fp[0] * TE) + a[1] * sin(2.0 * PI * fp[1] * TE) + a[2] * sin(2.0 * PI * fp[2] * TE) + a[3] * sin(2.0 * PI * fp[3] * TE) + a[4] * sin(2.0 * PI * fp[4] * TE) + a[5] * sin(2.0 * PI * fp[5] * TE)) * sin(TE * psi + phi) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * exp(-R2s * TE);
             sI = ((rho__W * sin(beta * alpha) * (1.0 - exp(-TR / T1__W)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__W)) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * cos(2.0 * PI * fp[0] * TE) + a[1] * cos(2.0 * PI * fp[1] * TE) + a[2] * cos(2.0 * PI * fp[2] * TE) + a[3] * cos(2.0 * PI * fp[3] * TE) + a[4] * cos(2.0 * PI * fp[4] * TE) + a[5] * cos(2.0 * PI * fp[5] * TE)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * sin(TE * psi + phi) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * sin(2.0 * PI * fp[0] * TE) + a[1] * sin(2.0 * PI * fp[1] * TE) + a[2] * sin(2.0 * PI * fp[2] * TE) + a[3] * sin(2.0 * PI * fp[3] * TE) + a[4] * sin(2.0 * PI * fp[4] * TE) + a[5] * sin(2.0 * PI * fp[5] * TE)) * cos(TE * psi + phi) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * exp(-R2s * TE);
             v.push_back(sR);
@@ -79,7 +77,7 @@ column_vector signal (const column_vector& unknowns, const column_vector& trs, c
         }
     }
     
-    matrix<double,0,1> sig = mat(v);
+    column_vector sig = mat(v);
     return sig;
 }
 
@@ -116,12 +114,12 @@ double residual (
     return model(data.first, params) - data.second;
 }
 
-double my_residual (
-    const std::pair<input_vector, double>& data,
-    const parameter_vector& params
+column_vector my_residual (
+    const std::pair<column_vector, column_vector>& data,
+    const column_vector& params
 )
 {
-    return model(data.first, params) - data.second;
+    return signal(data.first, params) - data.second;
 }
 
 
@@ -151,6 +149,23 @@ parameter_vector residual_derivative (
     return der;
 }
 
+
+unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+default_random_engine generator (seed);
+
+void noise2vector(column_vector& vect_in, const float stddev, const int NUMTHREADS)
+{
+    normal_distribution<double> distribution(0.0,1.0);
+    #pragma omp parallel shared(vect_in, stddev) private(seed) num_threads(NUMTHREADS)
+    {
+        #pragma omp for nowait
+        for (int n = 0; n < vect_in.nr(); n++)
+        {
+            vect_in(n,0)+=distribution(generator);
+        }
+
+    }
+}
 // ----------------------------------------------------------------------------------------
 
 int main()
@@ -160,106 +175,128 @@ int main()
 
     int NPs = 3; // Number of TR/FlipAngle Pairs
     int NTEs = 6; // Number of Echoes
-    int NACQS = NPs*NTEs;
 
     column_vector tes(NTEs); tes = 1.2e-3,3.2e-3,5.2e-3,7.2e-3,9.2e-3,11.2e-3;
     column_vector trs(NPs); trs = 5e-3,10e-3,15e-3;
     column_vector tips(NPs); tips = 6*PI/180,12*PI/180,80*PI/180;
+    column_vector input(NTEs+2*NPs); input = join_cols(trs,join_cols(tips,tes));
 
-    column_vector unknowns(8);
-    unknowns = 1,312e-3,822e-3,50,950,30,0,0;
+    double beta=1.0, T1__F=312e-3, T1__W=822e-3, rho__F=50, rho__W=9050, R2s=30, phi=0, psi=0;
+    column_vector unknowns(8); unknowns = beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi;
 
-    cout<<signal(unknowns, trs, tips, tes);
+    column_vector sig; sig=signal(input, unknowns); noise2vector(sig,1.0,1);
 
-    try
-    {
-        // randomly pick a set of parameters to use in this example
-        const parameter_vector params = 10*randm(3,1);
-        cout << "params: " << trans(params) << endl;
+    column_vector t1(3); t1=4,4,4;
+    column_vector t2(3); t2=2,2,2;
 
+    pair<column_vector,column_vector> data_sample;
+    data_sample = make_pair(input,sig);
+    cout<<data_sample.first<<"\n"<<data_sample.second<<"\n";
+    cout<<my_residual(data_sample,unknowns)<<endl;
 
-        // Now let's generate a bunch of input/output pairs according to our model.
-        std::vector<std::pair<input_vector, double> > data_samples;
-        input_vector input;
-        for (int i = 0; i < 1000; ++i)
-        {
-            input = 10*randm(2,1);
-            const double output = model(input, params);
-
-            // save the pair
-            data_samples.push_back(make_pair(input, output));
-        }
-
-        // Before we do anything, let's make sure that our derivative function defined above matches
-        // the approximate derivative computed using central differences (via derivative()).  
-        // If this value is big then it means we probably typed the derivative function incorrectly.
-        cout << "derivative error: " << length(residual_derivative(data_samples[0], params) - 
-                                               derivative(residual)(data_samples[0], params) ) << endl;
+    return 0;
 
 
 
+    column_vector x(8); x = beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi;
+    cout << "Use Levenberg-Marquardt, approximate derivatives" << endl;
+    // If we didn't create the residual_derivative function then we could
+    // have used this method which numerically approximates the derivatives for you.
+    solve_least_squares_lm(objective_delta_stop_strategy(1e-7).be_verbose(), 
+                           my_residual,
+                           derivative(my_residual),
+                           data_sample,
+                           x);
+
+    // try
+    // {
+    //     // randomly pick a set of parameters to use in this example
+    //     const parameter_vector params = 10*randm(3,1);
+    //     cout << "params: " << trans(params) << endl;
 
 
-        // Now let's use the solve_least_squares_lm() routine to figure out what the
-        // parameters are based on just the data_samples.
-        parameter_vector x;
-        x = 1;
+    //     // Now let's generate a bunch of input/output pairs according to our model.
+    //     std::vector<std::pair<input_vector, double> > data_samples;
+    //     input_vector input;
+    //     for (int i = 0; i < 1000; ++i)
+    //     {
+    //         input = 10*randm(2,1);
+    //         const double output = model(input, params);
 
-        cout << "Use Levenberg-Marquardt" << endl;
-        // Use the Levenberg-Marquardt method to determine the parameters which
-        // minimize the sum of all squared residuals.
-        solve_least_squares_lm(objective_delta_stop_strategy(1e-7).be_verbose(), 
-                               residual,
-                               residual_derivative,
-                               data_samples,
-                               x);
+    //         // save the pair
+    //         data_samples.push_back(make_pair(input, output));
+    //     }
 
-        // Now x contains the solution.  If everything worked it will be equal to params.
-        cout << "inferred parameters: "<< trans(x) << endl;
-        cout << "solution error:      "<< length(x - params) << endl;
-        cout << endl;
-
-
-
-
-        x = 1;
-        cout << "Use Levenberg-Marquardt, approximate derivatives" << endl;
-        // If we didn't create the residual_derivative function then we could
-        // have used this method which numerically approximates the derivatives for you.
-        solve_least_squares_lm(objective_delta_stop_strategy(1e-7).be_verbose(), 
-                               residual,
-                               derivative(residual),
-                               data_samples,
-                               x);
-
-        // Now x contains the solution.  If everything worked it will be equal to params.
-        cout << "inferred parameters: "<< trans(x) << endl;
-        cout << "solution error:      "<< length(x - params) << endl;
-        cout << endl;
+    //     // Before we do anything, let's make sure that our derivative function defined above matches
+    //     // the approximate derivative computed using central differences (via derivative()).  
+    //     // If this value is big then it means we probably typed the derivative function incorrectly.
+    //     cout << "derivative error: " << length(residual_derivative(data_samples[0], params) - 
+    //                                            derivative(residual)(data_samples[0], params) ) << endl;
 
 
 
 
-        x = 1;
-        cout << "Use Levenberg-Marquardt/quasi-newton hybrid" << endl;
-        // This version of the solver uses a method which is appropriate for problems
-        // where the residuals don't go to zero at the solution.  So in these cases
-        // it may provide a better answer.
-        solve_least_squares(objective_delta_stop_strategy(1e-7).be_verbose(), 
-                            residual,
-                            residual_derivative,
-                            data_samples,
-                            x);
 
-        // Now x contains the solution.  If everything worked it will be equal to params.
-        cout << "inferred parameters: "<< trans(x) << endl;
-        cout << "solution error:      "<< length(x - params) << endl;
+    //     // Now let's use the solve_least_squares_lm() routine to figure out what the
+    //     // parameters are based on just the data_samples.
+    //     parameter_vector x;
+    //     x = 1;
 
-    }
-    catch (std::exception& e)
-    {
-        cout << e.what() << endl;
-    }
+    //     cout << "Use Levenberg-Marquardt" << endl;
+    //     // Use the Levenberg-Marquardt method to determine the parameters which
+    //     // minimize the sum of all squared residuals.
+    //     solve_least_squares_lm(objective_delta_stop_strategy(1e-7).be_verbose(), 
+    //                            residual,
+    //                            residual_derivative,
+    //                            data_samples,
+    //                            x);
+
+    //     // Now x contains the solution.  If everything worked it will be equal to params.
+    //     cout << "inferred parameters: "<< trans(x) << endl;
+    //     cout << "solution error:      "<< length(x - params) << endl;
+    //     cout << endl;
+
+
+
+
+    //     x = 1;
+    //     cout << "Use Levenberg-Marquardt, approximate derivatives" << endl;
+    //     // If we didn't create the residual_derivative function then we could
+    //     // have used this method which numerically approximates the derivatives for you.
+    //     solve_least_squares_lm(objective_delta_stop_strategy(1e-7).be_verbose(), 
+    //                            residual,
+    //                            derivative(residual),
+    //                            data_samples,
+    //                            x);
+
+    //     // Now x contains the solution.  If everything worked it will be equal to params.
+    //     cout << "inferred parameters: "<< trans(x) << endl;
+    //     cout << "solution error:      "<< length(x - params) << endl;
+    //     cout << endl;
+
+
+
+
+    //     x = 1;
+    //     cout << "Use Levenberg-Marquardt/quasi-newton hybrid" << endl;
+    //     // This version of the solver uses a method which is appropriate for problems
+    //     // where the residuals don't go to zero at the solution.  So in these cases
+    //     // it may provide a better answer.
+    //     solve_least_squares(objective_delta_stop_strategy(1e-7).be_verbose(), 
+    //                         residual,
+    //                         residual_derivative,
+    //                         data_samples,
+    //                         x);
+
+    //     // Now x contains the solution.  If everything worked it will be equal to params.
+    //     cout << "inferred parameters: "<< trans(x) << endl;
+    //     cout << "solution error:      "<< length(x - params) << endl;
+
+    // }
+    // catch (std::exception& e)
+    // {
+    //     cout << e.what() << endl;
+    // }
 }
 
 // Example output:
