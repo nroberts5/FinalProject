@@ -21,7 +21,7 @@ debug : LDFLAGS := -fsanitize=address
 debug : ARCH :=
 debug : $(EXEC)
 
-all : least_squares_test
+all : main test least_squares_test
 
 # problem1: problem1.cu 
 # 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)

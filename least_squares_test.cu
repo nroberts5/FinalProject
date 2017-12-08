@@ -22,8 +22,66 @@ using namespace dlib;
 
 typedef matrix<double,2,1> input_vector;
 typedef matrix<double,3,1> parameter_vector;
+typedef matrix<double,0,1> column_vector;
 
 // ----------------------------------------------------------------------------------------
+
+#define FIELD_STRENGTH 3.0
+#define PI 3.141592654
+float ppm[6] = {0.6, -0.5, -1.95, -2.60, -3.40, -3.80};
+
+float* fp_maker(const float* ppm)
+{
+    float* fp = new float[6]; 
+    memcpy(fp,ppm,6*sizeof(float)); 
+    for(int i = 0; i < 6; i++)
+    {
+        fp[i] *= (FIELD_STRENGTH*42.577);
+    }
+    return fp;
+}
+
+float* fp = fp_maker(ppm);
+float a[6] = {4.7/100, 3.9/ 100, 0.6/ 100, 12.0/ 100, 70.0/ 100, 8.8/ 100};
+
+column_vector signal (const column_vector& unknowns, const column_vector& trs, const column_vector& tips, const column_vector& tes)
+{
+
+
+    const double beta = unknowns(0);
+    const double T1__F = unknowns(1);
+    const double T1__W = unknowns(2);
+    const double rho__F = unknowns(3);
+    const double rho__W = unknowns(4);
+    const double R2s = unknowns(5);
+    const double phi = unknowns(6);
+    const double psi = unknowns(7);
+
+    double TR;
+    double alpha;
+    double TE;
+    double sR;
+    double sI;
+
+    std::vector<double> v;
+    // compute signal model function and return the result
+    for (int ACQNUM = 0; ACQNUM < trs.nr(); ACQNUM++)
+    {
+        for (int TENUM = 0; TENUM < tes.nr(); TENUM++)
+        {
+            TR = trs(ACQNUM);
+            alpha = tips(ACQNUM);
+            TE = tes(TENUM);
+            sR = ((rho__W * sin(beta * alpha) * (1.0 - exp(-TR / T1__W)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__W)) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * cos(2.0 * PI * fp[0] * TE) + a[1] * cos(2.0 * PI * fp[1] * TE) + a[2] * cos(2.0 * PI * fp[2] * TE) + a[3] * cos(2.0 * PI * fp[3] * TE) + a[4] * cos(2.0 * PI * fp[4] * TE) + a[5] * cos(2.0 * PI * fp[5] * TE)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * cos(TE * psi + phi) - rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * sin(2.0 * PI * fp[0] * TE) + a[1] * sin(2.0 * PI * fp[1] * TE) + a[2] * sin(2.0 * PI * fp[2] * TE) + a[3] * sin(2.0 * PI * fp[3] * TE) + a[4] * sin(2.0 * PI * fp[4] * TE) + a[5] * sin(2.0 * PI * fp[5] * TE)) * sin(TE * psi + phi) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * exp(-R2s * TE);
+            sI = ((rho__W * sin(beta * alpha) * (1.0 - exp(-TR / T1__W)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__W)) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * cos(2.0 * PI * fp[0] * TE) + a[1] * cos(2.0 * PI * fp[1] * TE) + a[2] * cos(2.0 * PI * fp[2] * TE) + a[3] * cos(2.0 * PI * fp[3] * TE) + a[4] * cos(2.0 * PI * fp[4] * TE) + a[5] * cos(2.0 * PI * fp[5] * TE)) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * sin(TE * psi + phi) + rho__F * sin(beta * alpha) * (1.0 - exp(-TR / T1__F)) * (a[0] * sin(2.0 * PI * fp[0] * TE) + a[1] * sin(2.0 * PI * fp[1] * TE) + a[2] * sin(2.0 * PI * fp[2] * TE) + a[3] * sin(2.0 * PI * fp[3] * TE) + a[4] * sin(2.0 * PI * fp[4] * TE) + a[5] * sin(2.0 * PI * fp[5] * TE)) * cos(TE * psi + phi) / (1.0 - cos(beta * alpha) * exp(-TR / T1__F))) * exp(-R2s * TE);
+            v.push_back(sR);
+            v.push_back(sI);
+        }
+    }
+    
+    matrix<double,0,1> sig = mat(v);
+    return sig;
+}
 
 // We will use this function to generate data.  It represents a function of 2 variables
 // and 3 parameters.   The least squares procedure will be used to infer the values of 
@@ -58,6 +116,15 @@ double residual (
     return model(data.first, params) - data.second;
 }
 
+double my_residual (
+    const std::pair<input_vector, double>& data,
+    const parameter_vector& params
+)
+{
+    return model(data.first, params) - data.second;
+}
+
+
 // ----------------------------------------------------------------------------------------
 
 // This function is the derivative of the residual() function with respect to the parameters.
@@ -88,6 +155,22 @@ parameter_vector residual_derivative (
 
 int main()
 {
+    // column_vector acq_params(3);
+    // acq_params = 20e-3, 20*PI/180, 1.2e-3;
+
+    int NPs = 3; // Number of TR/FlipAngle Pairs
+    int NTEs = 6; // Number of Echoes
+    int NACQS = NPs*NTEs;
+
+    column_vector tes(NTEs); tes = 1.2e-3,3.2e-3,5.2e-3,7.2e-3,9.2e-3,11.2e-3;
+    column_vector trs(NPs); trs = 5e-3,10e-3,15e-3;
+    column_vector tips(NPs); tips = 6*PI/180,12*PI/180,80*PI/180;
+
+    column_vector unknowns(8);
+    unknowns = 1,312e-3,822e-3,50,950,30,0,0;
+
+    cout<<signal(unknowns, trs, tips, tes);
+
     try
     {
         // randomly pick a set of parameters to use in this example
