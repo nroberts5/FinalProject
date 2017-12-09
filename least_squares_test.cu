@@ -115,7 +115,7 @@ std::vector<pair<input_vector,double>> add_noise2signal_pairs(const std::vector<
 }
 
 
-void NLSQ(std::vector<pair<input_vector,double>> noiseless_data_samples, const double std_dev_noise, const parameter_vector& unknowns)
+column_vector NLSQ(std::vector<pair<input_vector,double>> noiseless_data_samples, const double std_dev_noise, const parameter_vector& unknowns)
 {
     std::vector<pair<input_vector,double>> noisy_data_samples = add_noise2signal_pairs(noiseless_data_samples,std_dev_noise);
     parameter_vector x;
@@ -126,6 +126,7 @@ void NLSQ(std::vector<pair<input_vector,double>> noiseless_data_samples, const d
                            derivative(residual),
                            noisy_data_samples,
                            x);
+    return x;
     // cout << "inferred parameters: "<< trans(x) << endl;
     // cout << "solution error:      "<< length(x - unknowns) << endl;
     // cout << endl;
@@ -160,14 +161,34 @@ int main(int argc, char const *argv[])
     std::vector<pair<input_vector,double>> noiseless_data_samples = signal_pairs(NACQS, NTES, trs, tips, tes, unknowns);
     
     struct stopwatch sw;
-    sw.click();
-    #pragma omp parallel for num_threads(NUMTHREADS)
-    for (int i = 0; i < NSIMS; i++)
+
+    double betas[NSIMS]{};
+
+    std::vector<double> timings;
+    int NUMTRIALS = 10;
+    if (NSIMS>=1000 && NUMTHREADS<=10)
     {
-        NLSQ(noiseless_data_samples, 1.0, unknowns);
+        NUMTRIALS = 1;
     }
-    sw.click();
-    sw.print_time();
+    for (int trial = 0; trial < NUMTRIALS; trial++)
+    {
+        sw.click();
+        #pragma omp parallel num_threads(NUMTHREADS)
+        {
+            #pragma omp for nowait
+            for (int i = 0; i < NSIMS; i++)
+            {
+                column_vector x = NLSQ(noiseless_data_samples, 1.0, unknowns);
+                betas[i] = x(0);
+            }
+        }
+        sw.click();
+        timings.push_back(sw.check());
+        // sw.print_time();
+    }
+    column_vector t = mat(timings);
+    double minTIME = dlib::min(t);
+    cout<<NSIMS<<", "<<NUMTHREADS<<", "<<minTIME/1000.0<<"s"<<", <"<<NUMTRIALS<<" trial(s)>"<<endl;
 
     return 0;
 }

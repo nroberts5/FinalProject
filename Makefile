@@ -33,7 +33,7 @@ test : test.cu
 	@ module load cuda;nvcc -o test $(OPT) test.cu -ccbin $(BIN)
 
 least_squares_test : least_squares_test.cu
-	@ module load cuda;nvcc -o least_squares_test $(OPT) least_squares_test.cu -ccbin $(BIN)
+	@ module load cuda;nvcc -o least_squares_test $(OPT) -Xcompiler -fopenmp least_squares_test.cu -ccbin $(BIN)
 
 # TODO: add targets for building executables
 
