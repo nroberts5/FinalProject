@@ -136,16 +136,19 @@ int main(int argc, char const *argv[])
 {
     int NUMTHREADS;
     int NSIMS;
+    int NUMTRIALS;
 
     if (argc<3)
     {
-        cout<<"Usage ./main NUMTHREADS NSIMS\n";
+        cout<<"Usage ./main NUMTHREADS NSIMS NUMTRIALS\n";
         return 1;
     }
     else
     {
         NUMTHREADS = atoi(argv[1]);
         NSIMS = atoi(argv[2]);
+        NUMTRIALS = atoi(argv[3]);
+
     }
 
     int NACQS = 3; // Number of TR/FlipAngle Pairs
@@ -165,11 +168,6 @@ int main(int argc, char const *argv[])
     double betas[NSIMS]{};
 
     std::vector<double> timings;
-    int NUMTRIALS = 10;
-    if (NSIMS>=1000 && NUMTHREADS<=10)
-    {
-        NUMTRIALS = 1;
-    }
     for (int trial = 0; trial < NUMTRIALS; trial++)
     {
         sw.click();
@@ -184,7 +182,6 @@ int main(int argc, char const *argv[])
         }
         sw.click();
         timings.push_back(sw.check());
-        // sw.print_time();
     }
     column_vector t = mat(timings);
     double minTIME = dlib::min(t);
