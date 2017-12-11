@@ -1,15 +1,3 @@
-// The contents of this file are in the public domain. See LICENSE_FOR_EXAMPLE_PROGRAMS.txt
-/*
-
-    This is an example illustrating the use the general purpose non-linear 
-    least squares optimization routines from the dlib C++ Library.
-
-    This example program will demonstrate how these routines can be used for data fitting.
-    In particular, we will generate a set of data and then use the least squares  
-    routines to infer the parameters of the model which generated the data.
-*/
-
-
 #include "./dlib-19.7/dlib/optimization.h"
 #include <iostream>
 #include <vector>
@@ -17,6 +5,8 @@
 #include <chrono>
 #include <random>
 #include "tools.hpp"
+#include <fstream>
+#include <string>
 
 
 using namespace std;
@@ -53,6 +43,8 @@ float* fp_maker(const float* ppm)
 
 float* fp = fp_maker(ppm);
 float a[6] = {4.7/100, 3.9/ 100, 0.6/ 100, 12.0/ 100, 70.0/ 100, 8.8/ 100};
+
+// ----------------------------------------------------------------------------------------
 
 double signal (const column_vector& acq_params, const column_vector& unknowns)
 {
@@ -93,7 +85,7 @@ std::vector<pair<input_vector,double>> signal_pairs(const int NACQS, const int N
             for (int real_part = 1; real_part >=0; real_part--)
             {
                 input = trs(nacq), tips(nacq), tes(nte), real_part;
-                const double sim_sig = signal(input,unknowns);//+distribution(generator); 
+                const double sim_sig = signal(input,unknowns);
                 data_samples.push_back(make_pair(input,sim_sig));
             }
         }
@@ -165,7 +157,19 @@ int main(int argc, char const *argv[])
     
     struct stopwatch sw;
 
-    double betas[NSIMS]{};
+    // double betas[NSIMS]{};
+    // double t1fs[NSIMS]{};
+    // double t2ws[NSIMS]{};
+    // double rhofs[NSIMS]{};
+    // double rhows[NSIMS]{};
+    // double r2ss[NSIMS]{};
+    // double phis[NSIMS]{};
+    // double psis[NSIMS]{};
+
+    double param_estimates[8][NSIMS];
+
+
+
 
     std::vector<double> timings;
     for (int trial = 0; trial < NUMTRIALS; trial++)
@@ -177,11 +181,42 @@ int main(int argc, char const *argv[])
             for (int i = 0; i < NSIMS; i++)
             {
                 column_vector x = NLSQ(noiseless_data_samples, 1.0, unknowns);
-                betas[i] = x(0);
+                // betas[i] = x(0);
+                // t1fs[i] = x(1);
+                // t2ws[i] = x(2);
+                // rhofs[i] = x(3);
+                // rhows[i] = x(4);
+                // r2ss[i] = x(5);
+                // phis[i] = x(6);
+                // psis[i] = x(7);
+
+                param_estimates[0][i] = x(0);
+                param_estimates[1][i] = x(1);
+                param_estimates[2][i] = x(2);
+                param_estimates[3][i] = x(3);
+                param_estimates[4][i] = x(4);
+                param_estimates[5][i] = x(5);
+                param_estimates[6][i] = x(6);
+                param_estimates[7][i] = x(7);
             }
         }
         sw.click();
         timings.push_back(sw.check());
+
+        string names[] = {"beta.out", "T1__F.out", "T1__W.out", "rho__F.out", "rho__W.out", "R2s.out", "phi.out", "psi.out"};
+        
+        for (int n = 0; n < 8; n++)
+        {
+            ofstream outfile;
+            outfile.open (names[n]);
+            for (int i = 0; i < NSIMS; i++)
+            {
+                outfile<<param_estimates[n][i]<<"\n";
+            }
+            outfile.close();
+        }
+        
+
     }
     column_vector t = mat(timings);
     double minTIME = dlib::min(t);
