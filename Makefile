@@ -32,9 +32,6 @@ all : least_squares_test
 least_squares_test : least_squares_test.cu
 	@ module load cuda;nvcc -o least_squares_test $(OPT) -Xcompiler -fopenmp least_squares_test.cu -ccbin $(BIN)
 
-create : create.cpp
-	@ h5c++ -o create create.cpp
-
 # TODO: add targets for building executables
 
 .PHONY: clean

@@ -1,1 +1,2 @@
 Matlab, single thread, 10000 simulations: Elapsed time is 598.877302 seconds.
+Matlab, 4 threads, 10000 simulations: Elapsed time is 237.478829 seconds.
