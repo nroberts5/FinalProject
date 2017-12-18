@@ -1,0 +1,11 @@
+Your First Name:
+Your Last Name:
+The Last four digits of your UW-Madison student ID: 
+URL to Final Project GitHub repo (used for grading): 
+Participate in Rescale competition for Surface tablet: Yes/No
+Name[s] of your Final Project teammates: FirstLast1, FirstLast2, FirstLast3, etc.
+I took care of the course evaluation: Yes/No
+
+NOTE: It's ok for a team to only generate one Final Report. However, this same document should show up in the Final Project folder of each team member.
+
+P.S. I obviously can't check if you evaluated the course. But I thought I'd ask anyway and see how you spin it.

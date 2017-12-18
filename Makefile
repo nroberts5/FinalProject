@@ -21,7 +21,7 @@ debug : LDFLAGS := -fsanitize=address
 debug : ARCH :=
 debug : $(EXEC)
 
-all : least_squares_test
+all : least_squares_test MPI_Test
 
 # problem1: problem1.cu 
 # 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)
@@ -32,9 +32,12 @@ all : least_squares_test
 least_squares_test : least_squares_test.cu
 	@ module load cuda;nvcc -o least_squares_test $(OPT) -Xcompiler -fopenmp least_squares_test.cu -ccbin $(BIN)
 
+MPI_Test: MPI_Test.cpp
+	@ module load openmpi/2.1.1;mpicxx -o MPI_Test $(CXXSTD) $(WFLAGS) $(OPT) -fopenmp  MPI_Test.cpp
+
 # TODO: add targets for building executables
 
 .PHONY: clean
 clean:
-	rm -f main least_squares_test
+	rm -f main least_squares_test MPI_Test
 	rm -f *.err *.out
