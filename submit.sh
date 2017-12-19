@@ -7,4 +7,4 @@
 #SBATCH --output=/srv/home/nroberts5/FinalProject/output.out
 #SBATCH --gres=gpu:0
 module load cuda
-./least_squares_test 40 10000 1
+./NLSQ 40 10000 1
