@@ -33,7 +33,7 @@ least_squares_test : least_squares_test.cu
 	@ module load cuda;nvcc -o least_squares_test $(OPT) -Xcompiler -fopenmp least_squares_test.cu -ccbin $(BIN)
 
 MPI_Test: MPI_Test.cpp
-	@ module load openmpi/2.1.1;mpicxx -o MPI_Test $(CXXSTD) $(WFLAGS) $(OPT) -fopenmp  MPI_Test.cpp
+	@ module load openmpi/2.1.1;mpicxx -o MPI_Test $(CXXSTD) $(OPT) -fopenmp  MPI_Test.cpp
 
 # TODO: add targets for building executables
 
