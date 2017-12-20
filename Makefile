@@ -21,23 +21,16 @@ debug : LDFLAGS := -fsanitize=address
 debug : ARCH :=
 debug : $(EXEC)
 
-all : MC_NLSQ MPI_Test
-
-# problem1: problem1.cu 
-# 	module load cuda;nvcc -o problem1 $(OPT) problem1.cu -ccbin $(BIN)
-
-# main : main.cu
-# 	@ module load cuda;nvcc -o main $(OPT) main.cu -ccbin $(BIN)
+all : MC_NLSQ MC_NLSQ_MPI
 
 MC_NLSQ : MC_NLSQ.cu
 	@ module load cuda;nvcc -o MC_NLSQ $(OPT) -Xcompiler -fopenmp MC_NLSQ.cu -ccbin $(BIN)
 
-MPI_Test: MPI_Test.cpp
-	@ module load openmpi/2.1.1;mpicxx -o MPI_Test $(CXXSTD) $(OPT) -fopenmp  MPI_Test.cpp
+MC_NLSQ_MPI: MC_NLSQ_MPI.cpp
+	@ module load openmpi/2.1.1;mpicxx -o MC_NLSQ_MPI $(CXXSTD) $(OPT) -fopenmp  MC_NLSQ_MPI.cpp
 
-# TODO: add targets for building executables
 
 .PHONY: clean
 clean:
-	rm -f MC_NLSQ MPI_Test
+	rm -f MC_NLSQ MC_NLSQ_MPI
 	rm -f *.err *.out
