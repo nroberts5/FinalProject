@@ -197,10 +197,10 @@ int main(int argc, char *argv[]) {
 
 	if(ctx.rank() == 0) {
 		int x=0;
-		constexpr int source_rank = 1;  // We expect a message from Task 1
+		constexpr int source_rank = 1;
 		MPI_Status status;
-		MPI_Recv(&x, 1, MPI_INT, source_rank, 0, MPI_COMM_WORLD, &status);
-		std::cout << "Received x = " << x << " on root task.\n";
+		MPI_Recv(&x, 1, MPI_INT, source_rank, 0, MPI_COMM_WORLD, &status); // Wait until the second node is done writing data, then write data.
+		// std::cout << "Received x = " << x << " on root task.\n";
 
 		string names[] = {"beta.out", "T1__F.out", "T1__W.out", "rho__F.out", "rho__W.out", "R2s.out", "phi.out", "psi.out"};
     
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
 	    }
 
 		const int i=1;
-		constexpr int dest_rank = 0;  // We send a message to Task 0
+		constexpr int dest_rank = 0;  // Tell node0 that we are done with writing out data.
 		MPI_Send(&i, 1, MPI_INT, dest_rank, 0, MPI_COMM_WORLD);
 	}
 }
