@@ -12,53 +12,45 @@ def main():
         sns.plt.figure(1)
         sns.set_style("whitegrid")
 
-        df = pd.read_csv(sys.argv[1])
-        n = np.array(df["N"])
-        t = np.array(df["CPU"])
+        # sns.plt.plot([0,40],[598.877302,598.877302],'r--',label='Serial Matlab N = 10000')
+        sns.plt.plot([0,40],[237.478829,237.478829],'r-',label='Reference: Parallel Matlab (4 Threads)')
+
+        ORIG_DF = pd.read_csv(sys.argv[1])
+
+        df = ORIG_DF.loc[ORIG_DF["N"]==10000]
+        print df
+        n = np.array(df["NT"])
+        t = np.array(df["T"])
         nn = np.linspace(1, np.max(n), 1000)
         p = np.polyfit(np.log10(n),np.log10(t),float(sys.argv[2]))
         fit = np.poly1d(p)
-        sns.plt.loglog(n, t, c='k', marker='o',linestyle='',basex=2)
-        sns.plt.loglog(nn, 10 ** fit(np.log10(nn)), 'k--', label='CPU',basex=2)
+        sns.plt.plot(n, t, c='b', marker='o',linestyle='')
+        sns.plt.plot(nn, 10 ** fit(np.log10(nn)), 'b--', label='Parallel OpenMP (1 node)')
 
-        t = np.array(df["GPUin"])
+        
+        ORIG_DF = pd.read_csv('mpi_timing.csv')
+
+        df = ORIG_DF.loc[ORIG_DF["N"]==10000]
+        print df
+        n = np.array(df["NT"])
+        t = np.array(df["T"])
         nn = np.linspace(1, np.max(n), 1000)
         p = np.polyfit(np.log10(n),np.log10(t),float(sys.argv[2]))
         fit = np.poly1d(p)
-        sns.plt.loglog(n, t, c='b', marker='o',linestyle='')
-        sns.plt.loglog(nn, 10 ** fit(np.log10(nn)), 'b--', label='HW10GPU Inclusive',basex=2)
+        sns.plt.plot(n, t, c='k', marker='o',linestyle='')
+        sns.plt.plot(nn, 10 ** fit(np.log10(nn)), 'k--', label='Parallel OpenMP & MPI (2 nodes)')
 
-        t = np.array(df["GPUex"])
-        nn = np.linspace(1, np.max(n), 1000)
-        p = np.polyfit(np.log10(n),np.log10(t),float(sys.argv[2]))
-        fit = np.poly1d(p)
-        sns.plt.loglog(n, t, c='r', marker='o',linestyle='')
-        sns.plt.loglog(nn, 10 ** fit(np.log10(nn)), 'r--', label='HW10GPU Exclusive',basex=2)
-
-        t = np.array(df["Thrustin"])
-        nn = np.linspace(1, np.max(n), 1000)
-        p = np.polyfit(np.log10(n),np.log10(t),float(sys.argv[2]))
-        fit = np.poly1d(p)
-        sns.plt.loglog(n, t, c='b', marker='*',linestyle='')
-        sns.plt.loglog(nn, 10 ** fit(np.log10(nn)), 'b-', label='ThrustGPU Inclusive',basex=2)
-
-        t = np.array(df["Thrustex"])
-        nn = np.linspace(1, np.max(n), 1000)
-        p = np.polyfit(np.log10(n),np.log10(t),float(sys.argv[2]))
-        fit = np.poly1d(p)
-        sns.plt.loglog(n, t, c='r', marker='*',linestyle='')
-        sns.plt.loglog(nn, 10 ** fit(np.log10(nn)), 'r-', label='ThrustGPU Exclusive',basex=2)
+        
 
 
-        sns.plt.title('Problem 1 Scaling Analysis \n(Euler99)')
-        sns.plt.ylabel('Time (ms)')
-        sns.plt.xlabel('N')
-        sns.plt.legend(loc=4)
+        sns.plt.title('Paralleized Monte Carlo Simulations\nN=10,000')
+        sns.plt.ylabel('Time (seconds)')
+        sns.plt.xlabel('Number of OpenMP Threads per Node')
+        sns.plt.legend(loc=5)
 
 
 
-        sns.plt.xlim([2**0,2**24])
-        # sns.plt.ylim([0,3000])
+        sns.plt.xlim([1,40])
         sns.plt.savefig('./res.pdf')
         sns.plt.show()
     else:

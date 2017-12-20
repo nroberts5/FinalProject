@@ -1,4 +1,4 @@
-N, NUMTHREADS, Time(sec), TRIALS
+N,NT,T,TRS
 10, 1, 0.203448, <10 trial(s)>
 10, 5, 0.0579573, <10 trial(s)>
 10, 10, 0.034073, <10 trial(s)>
