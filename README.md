@@ -6,7 +6,7 @@
 ## With MPI
 * Usage: mpiexec -np 2 ./MC_NLSQ_MPI NUMTHREADS Number_of_Sims
 
-## Definitions:
+## Input Definitions:
 * NUMTHREADS = Integer Number of OpenMP Threads Per Node
 * Number_of_Sims = Integer Number of Monte Carlo Simulations to Perform
 
