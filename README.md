@@ -3,7 +3,7 @@
 ## Without MPI
 * Usage: ./MC_NLSQ NUMTHREADS Number_of_Sims
 
-##With MPI
+## With MPI
 * Usage: mpiexec -np 2 ./MC_NLSQ_MPI NUMTHREADS Number_of_Sims
 
 ## Definitions:
