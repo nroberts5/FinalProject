@@ -8,5 +8,5 @@
 #SBATCH --gres=gpu:0
 
 module load openmpi/2.1.1
-mpiexec -np 2 ./MC_NLSQ_MPI 10 100000 1
-mpiexec -np 2 ./MC_NLSQ_MPI 40 100000 1
+mpiexec -np 2 ./MC_NLSQ_MPI 10 100000
+mpiexec -np 2 ./MC_NLSQ_MPI 40 100000

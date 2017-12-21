@@ -24,9 +24,11 @@ debug : $(EXEC)
 all : MC_NLSQ MC_NLSQ_MPI
 
 MC_NLSQ : MC_NLSQ.cu
+	@ echo "Usage: ./MC_NLSQ NUMTHREADS Number_of_Sims"
 	@ module load cuda;nvcc -o MC_NLSQ $(OPT) -Xcompiler -fopenmp MC_NLSQ.cu -ccbin $(BIN)
 
 MC_NLSQ_MPI: MC_NLSQ_MPI.cpp
+	@ echo "Usage: mpiexec -np 2 ./MC_NLSQ_MPI NUMTHREADS Number_of_Sims"
 	@ module load openmpi/2.1.1;mpicxx -o MC_NLSQ_MPI $(CXXSTD) $(OPT) -fopenmp  MC_NLSQ_MPI.cpp
 
 
