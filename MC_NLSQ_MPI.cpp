@@ -139,16 +139,12 @@ column_vector NLSQ(std::vector<pair<input_vector,double>> noiseless_data_samples
     std::vector<pair<input_vector,double>> noisy_data_samples = add_noise2signal_pairs(noiseless_data_samples,std_dev_noise);
     parameter_vector x;
     x=1, 300e-3, 800e-3, 5000, 5000, 0, 0, 0;
-    // cout << "Use Levenberg-Marquardt, approximate derivatives" << endl;
     solve_least_squares_lm(objective_delta_stop_strategy(1e-10)/*.be_verbose()*/, 
                            residual,
                            derivative(residual),
                            noisy_data_samples,
                            x);
     return x;
-    // cout << "inferred parameters: "<< trans(x) << endl;
-    // cout << "solution error:      "<< length(x - unknowns) << endl;
-    // cout << endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -160,38 +156,44 @@ int main(int argc, char *argv[]) {
 
     int NUMTHREADS;
     int NSIMS;
-    int NUMTRIALS;
+    int NUMTRIALS=1;
 
     if (argc<3)
     {
-        cout<<"Usage ./main NUMTHREADS NSIMS NUMTRIALS\n";
+        cout<<"Usage ./MC_NLSQ_MPI NUMTHREADS NSIMS\n";
         return 1;
     }
     else
     {
         NUMTHREADS = atoi(argv[1]);
         NSIMS = atoi(argv[2]) / 2;
-        NUMTRIALS = atoi(argv[3]);
+        // NUMTRIALS = atoi(argv[3]);
     }
 
     int NACQS = 3; // Number of TR/FlipAngle Pairs
     int NTES = 6; // Number of Echoes
 
+    // Define Acquisition Parameters
     column_vector trs(NACQS); trs = 5e-3,10e-3,15e-3;
     column_vector tips(NACQS); tips = 6*PI/180,12*PI/180,80*PI/180;
     column_vector tes(NTES); tes = 1.2e-3,3.2e-3,5.2e-3,7.2e-3,9.2e-3,11.2e-3;
-
+    
+    // Define Unknown Parameters (set their true values for simulation)
     double beta=1.0, T1__F=312e-3, T1__W=822e-3, rho__F=50, rho__W=9050, R2s=30, phi=0, psi=0;
     parameter_vector unknowns; unknowns = beta, T1__F, T1__W, rho__F, rho__W, R2s, phi, psi;
 
+    // Generate the noiseless expected signal values in a structure usable by the NLSQ function
     std::vector<pair<input_vector,double>> noiseless_data_samples = signal_pairs(NACQS, NTES, trs, tips, tes, unknowns);
     
     struct stopwatch sw;
     double param_estimates[8][NSIMS];
+
+    // Outler loop is for timing analysis
     std::vector<double> timings;
     for (int trial = 0; trial < NUMTRIALS; trial++)
     {
         sw.click();
+        // OpenMP Parallel Region
         #pragma omp parallel num_threads(NUMTHREADS)
         {
             #pragma omp for nowait
@@ -214,7 +216,9 @@ int main(int argc, char *argv[]) {
     column_vector t = mat(timings);
     double minTIME = dlib::min(t);
 
-	if(ctx.rank() == 0) {
+	
+    // Save results safely with MPI blocking send and receives
+    if(ctx.rank() == 0) {
 		int x=0;
 		constexpr int source_rank = 1;
 		MPI_Status status;

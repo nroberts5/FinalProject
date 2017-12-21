@@ -1,2 +1,4 @@
 # FinalProject
 NRoberts_ECE759_FinalProject
+Usage ./MC_NLSQ NUMTHREADS NSIMS
+Usage ./MC_NLSQ_MPI NUMTHREADS NSIMS
