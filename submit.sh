@@ -6,5 +6,6 @@
 #SBATCH --error=/srv/home/nroberts5/FinalProject/error_out.err
 #SBATCH --output=/srv/home/nroberts5/FinalProject/output.out
 #SBATCH --gres=gpu:0
+
 module load cuda
-./NLSQ 40 10000
+./MC_NLSQ 40 10000
